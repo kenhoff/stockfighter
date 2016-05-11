@@ -78,7 +78,9 @@ module.exports = function(opts) {
 										stock_id
 									}, arg)
 									placeOrder(order_opts, function(err, result) {
-										cb(err, result)
+										if (cb) {
+											cb(err, result)
+										}
 									})
 								}
 							}
