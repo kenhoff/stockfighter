@@ -88,7 +88,36 @@ module.exports = function(opts) {
 					}
 				}
 			}
+		},
+		levels: (arg1) => {
+			if (typeof arg1 == "function") {
+				cb = arg1
+				request({
+					method: "GET",
+					url: "https://www.stockfighter.io/gm/levels",
+					headers: {
+						"X-Starfighter-Authorization": api_key,
+					}
+				}, function(err, response, body) {
+					cb(err, JSON.parse(body))
+				})
+			} else {
+				return {
+					start: (cb) => {
+						request({
+							method: "POST",
+							url: "https://www.stockfighter.io/gm/levels/" + arg1,
+							headers: {
+								"X-Starfighter-Authorization": api_key,
+							}
+						}, function(err, response, body) {
+							cb(err, JSON.parse(body))
+						})
+					}
+				}
+			}
 		}
+
 	}
 }
 
@@ -115,7 +144,7 @@ placeOrder = function(opts, cb) {
 			price: opts.price,
 			qty: opts.qty,
 			direction: opts.direction,
-			orderType: opts.order_type
+			orderType: opts.order_type || "limit"
 		},
 		json: true,
 		headers: {
