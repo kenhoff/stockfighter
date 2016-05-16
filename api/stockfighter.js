@@ -61,7 +61,26 @@ module.exports = function(opts) {
 								})
 							},
 							order: (arg, cb) => {
-								if (typeof arg == "number") {
+								if (!cb) {
+									// return object with place (not implemented yet) and cancel
+									return {
+										cancel: (cb) => {
+											order = arg
+											request({
+												method: "DELETE",
+												url: "https://api.stockfighter.io/ob/api/venues/" + venue_id + "/stocks/" + stock_id + "/orders/" + order,
+												headers: {
+													"X-Starfighter-Authorization": api_key,
+												}
+											}, function(err, response, body) {
+												if (!JSON.parse(body).ok) {
+													err = JSON.parse(body).error
+												}
+												cb(err, JSON.parse(body))
+											})
+										}
+									}
+								} else if (typeof arg == "number") {
 									order_id = arg
 									getOrder({
 										api_key,
@@ -111,6 +130,9 @@ module.exports = function(opts) {
 								"X-Starfighter-Authorization": api_key,
 							}
 						}, function(err, response, body) {
+							if (!JSON.parse(body).ok) {
+								err = JSON.parse(body).error
+							}
 							cb(err, JSON.parse(body))
 						})
 					}
@@ -129,6 +151,9 @@ getOrder = function(opts, cb) {
 			"X-Starfighter-Authorization": opts.api_key,
 		}
 	}, function(err, response, body) {
+		if (!JSON.parse(body).ok) {
+			err = JSON.parse(body).error
+		}
 		cb(err, JSON.parse(body))
 	})
 }
@@ -138,7 +163,7 @@ placeOrder = function(opts, cb) {
 		method: "POST",
 		url: "https://api.stockfighter.io/ob/api/venues/" + opts.venue_id + "/stocks/" + opts.stock_id + "/orders",
 		body: {
-			account: opts.account_id,
+			account: opts.account,
 			venue: opts.venue_id,
 			stock: opts.stock_id,
 			price: opts.price,
@@ -151,6 +176,9 @@ placeOrder = function(opts, cb) {
 			"X-Starfighter-Authorization": api_key,
 		}
 	}, function(err, response, body) {
+		if (!body.ok) {
+			err = body.error
+		}
 		cb(err, body)
 	})
 }

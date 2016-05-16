@@ -4,127 +4,89 @@ var tradebot = Stockfighter({
 	api_key: "dbc9501eddfbaed304dbe2ce2d9ee6be901143c9"
 })
 
-open_orders = []
+openOrders = []
 position = 0 // number of shares in either direction
-position_acquire_price = 0 // how much we bought/sold our existing position for
+percentSpread = .1 // percentage of last trade price
+quantity = 100
 
 
 // buy increases position
 // sell decreases position
 // shouldn't go above 1000 or below 1000
 
-// tradebot.venue("GJBTEX").stock("SCL").order(2560, function(err, data) {
-// 	console.log(data);
-// })
-
-
-// average position value is total position value / position
-
-// every tick, look at the current quote for the stock
-// if position is zero, just buy a share at ask price
-
-// tradebot.venue("GPYBEX").stock("IWJE").quote(function(err, data) {
-// 	console.log(data);
-// })
-
 tradebot.levels("sell_side").start(function(err, game) {
-	// console.log(game);
+	if (err) {
+		throw err
+	}
 	setInterval(() => {
-		tradebot.venue(game.venues[0]).stock(game.tickers[0]).quote(function(err, data) {
-				if (err) {
-					throw err
-				} else {
-					// if position is greater than -1000, and bid price is greater than position_acquire_price, put in a sell order
-					if (data.bid >= (position_acquire_price)) {
-						order_opts = {
-							account_id: game.account,
-							price: data.bid,
-							qty: Math.round(data.bidSize / 10),
-							direction: "sell"
-						}
-						tradebot.venue(game.venues[0]).stock(game.tickers[0]).order(order_opts, function(err, order) {
-							if (err) {
-								throw err
-							} else {
-								console.log("Put in a sell order for", order_opts.qty, "at", order_opts.price, "for a total of", order_opts.qty * order_opts.price);
-								open_orders.push(order.id)
-							}
-						})
-					}
+		// cancel existing orders
 
-					// if position is less than 1000, and ask price is less than position_acquire_price, put in a buy order
-					if (data.ask <= (position_acquire_price)) {
-						order_opts = {
-							account_id: game.account,
-							price: data.ask,
-							qty: Math.round(data.askSize / 10),
-							direction: "buy"
-						}
-						tradebot.venue(game.venues[0]).stock(game.tickers[0]).order(order_opts, function(err, order) {
-							if (err) {
-								throw err
-							} else {
-								console.log("Put in a buy order for", order_opts.qty, "at", order_opts.price, "for a total of", order_opts.qty * order_opts.price);
-								open_orders.push(order.id)
-							}
-						})
-					}
-
-
-					//  else {
-					// 	if (data.ask && (data.ask != 0)) {
-					// 		order_opts = {
-					// 			account_id: game.account,
-					// 			price: data.ask,
-					// 			qty: 1,
-					// 			direction: "buy"
-					// 		}
-					// 		tradebot.venue(game.venues[0]).stock(game.tickers[0]).order(order_opts, function(err, order) {
-					// 			if (err) {
-					// 				throw err
-					// 			} else {
-					// 				// console.log(order);
-					// 				open_orders.push(order.id)
-					// 			}
-					// 		})
-					// 	}
-					// }
-				}
-			})
-			// every tick, look through my current (open) orders
-			// if the order is filled:
-			// 	add (if buy) or subtract (if sell) quantity filled
-			// 	add (if buy) or subtract (if sell) total from total position value
-			// 	remove the order ID from the open orders
-		for (var i = open_orders.length - 1; i >= 0; i--) {
-			// query tradebot to see if order got filled
-			tradebot.venue(game.venues[0]).stock(game.tickers[0]).order(open_orders[i], function(err, order) {
-				if (!order.open) {
-					if (order.direction == "buy") {
-						if (position >= 0) {
-							position_acquire_price = ((position_acquire_price * position) + (order.price * order.originalQty)) / (position + order.originalQty)
-						}
-						position += order.originalQty
-						console.log("Bought", order.originalQty, "at", order.price, "for a total of", order.originalQty * order.price);
-					} else { // order direction sell
-						if (position <= 0) {
-							position_acquire_price = ((position_acquire_price * -position) + (order.price * order.originalQty)) / -(position - order.originalQty)
-						}
-						position -= order.originalQty
-						console.log("Sold", order.originalQty, "at", order.price, "for a total of", order.originalQty * order.price);
-					}
-
-					if (position == 0) {
-						position_acquire_price = 0
-					}
-
-					// console.log("Removing order", order.id, "at position", i);
-					open_orders.splice(i, 1)
-				}
-			})
+		for (var i = 0; i < openOrders.length; i++) {
+			openOrders[i]
+			cancelOrder(openOrders[i])
 		}
+		openOrders = []
+			// place new orders
+		tradebot.venue(game.venues[0]).stock(game.tickers[0]).quote((err, quote) => {
+			// console.log(quote);
+			lastPrice = quote.last
+			buyPrice = Math.round(quote.last - ((quote.last * percentSpread) / 2))
+			sellPrice = Math.round(quote.last + ((quote.last * percentSpread) / 2))
+			console.log("Last price:", lastPrice);
+			console.log("Spread:", quote.last * percentSpread);
+			// if position < 500, place buy order
+			if (position < 500) {
+				tradebot.venue(game.venues[0]).stock(game.tickers[0]).order({
+					account: game.account,
+					price: buyPrice,
+					qty: quantity,
+					direction: "buy"
+				}, function(err, newOrder) {
+					if (err) {
+						throw err
+					} else {
+						console.log("Placed buy order (" + newOrder.id + ") for", buyPrice);
+						openOrders.push(newOrder.id)
+					}
+				})
+			}
+			// if position > -500, place sell order
+			if (position > 500) {
+				tradebot.venue(game.venues[0]).stock(game.tickers[0]).order({
+					account: game.account,
+					price: sellPrice,
+					qty: quantity,
+					direction: "sell"
+				}, function(err, newOrder) {
+					if (err) {
+						throw err
+					} else {
+						console.log("Placed sell order (" + newOrder.id + ") for", sellPrice);
+						openOrders.push(newOrder.id)
+					}
+				})
+			}
+		})
 		console.log("Position:", position);
-		console.log("Position acquire price:", position_acquire_price);
-		console.log("Open orders:", open_orders.length);
+		console.log("Open orders:", openOrders.length);
 	}, 5000)
+
+	var cancelOrder = (orderID) => {
+		// cancel order, and adjust position with totalFilled
+		tradebot.venue(game.venues[0]).stock(game.tickers[0]).order(orderID).cancel((err, canceledOrder) => {
+			if (err) {
+				throw err
+			}
+			// adjust position based on direction and quantity filled
+			console.log("Current position:", position);
+			if (canceledOrder.direction == "buy") {
+				position += canceledOrder.totalFilled
+				console.log("Closed buy order (" + canceledOrder.id + ") for qty", canceledOrder.totalFilled);
+			} else if (canceledOrder.direction == "sell") {
+				position -= canceledOrder.totalFilled
+				console.log("Closed sell order (" + canceledOrder.id + ") for qty", canceledOrder.totalFilled);
+			}
+			console.log("New position:", position);
+		})
+	}
 })
